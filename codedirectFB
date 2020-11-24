@@ -1,0 +1,31 @@
+function hocwp_theme_custom_get_facebook_url( $url ) {
+    $tr_name = 'hocwp_facebook_video_direct_url_' . md5( $url );
+    if ( false === ( $result = get_transient( $tr_name ) ) ) {
+        $res  = wp_remote_post( $url );
+        $body = wp_remote_retrieve_body( $res );
+        $dom  = new DomDocument();
+        $save = false;
+
+        $internalErrors = libxml_use_internal_errors( true );
+        $dom->loadHTML( $body );
+        libxml_use_internal_errors( $internalErrors );
+        $scripts = $dom->getElementsByTagName( 'script' );
+        foreach ( $scripts as $script ) {
+            $html = $dom->saveHTML( $script );
+            if ( false !== strpos( $html, '.mp4' ) ) {
+                $html = strstr( $html, 'videoData:[{' );
+                $html = strstr( $html, '}],', true );
+                $html = str_replace( 'videoData:[', '', $html );
+                $html .= '}';
+                preg_match_all( '#\bhttps?://[^,\s()<>]+(?:\([\w\d]+\)|([^,[:punct:]\s]|/))#', $html, $matches );
+                $result = $matches[0];
+                if ( is_array( $result ) && 0 < count( $result ) ) {
+                    set_transient( $tr_name, $result, DAY_IN_SECONDS );
+                    break;
+                }
+            }
+        }
+    }
+
+    return $result;
+}
